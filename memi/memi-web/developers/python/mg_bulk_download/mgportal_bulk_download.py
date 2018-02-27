@@ -194,7 +194,7 @@ if __name__ == "__main__":
         # PredictedCDS is version 1.0 and 2.0 only, from version 3.0 on this file type was replaced by
         # PredictedCDSWithAnnotation (PredictedCDS can be gained by
         # concatenation of the 2 sequence file types now)
-        elif file_type == 'PredictedCDS' or file_type == 'PredicatedCDSWithoutAnnotation' or file_type == \
+        elif file_type == 'PredictedCDS' or file_type == 'PredictedCDSWithoutAnnotation' or file_type == \
                 'PredictedCDSWithAnnotation':
             if file_type == 'PredictedCDSWithAnnotation' and (version == '1.0' or version == '2.0'):
                 print("File type '" + file_type +
