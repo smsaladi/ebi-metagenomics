@@ -21,7 +21,7 @@ import urllib.parse
 from urllib.error import URLError
 
 
-def _download_resource_by_url(url, output_file_name):
+def _download_resource_by_url(url, output_file_name, raiseError=True):
     """Kicks off a download and stores the file at the given path.
     Arguments:
     'url' -- Resource location.
@@ -33,16 +33,14 @@ def _download_resource_by_url(url, output_file_name):
 
     try:
         urllib.request.urlretrieve(url, output_file_name)
-    except URLError as url_error:
-        print(url_error)
-        raise
-    except IOError as io_error:
-        print(io_error)
-        raise
+    except Exception as err:
+        print(err)
+        if raiseError:
+            raise err
     print("Download finished.")
 
 
-def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, domain, file_type):
+def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, domain, file_type, raiseError=True):
     """
     Returns the number of chunks for the given set of parameters (study, sample and run identifier).
     """
@@ -55,20 +53,18 @@ def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, do
         result = int(file_stream_handler.read())
         print("Retrieved " + str(result) + " chunks.")
         return result
-    except URLError as url_error:
-        print(url_error)
-        raise
-    except IOError as io_error:
-        print(io_error)
-        raise
     except ValueError as e:
         print(e)
         print("Skipping this run! Could not retrieve the number of chunks for this URL. "
               "Check the version number in the URL and check if the run is available online.")
         return 0
+    except Exception as err:
+        print(err)
+        if raiseError:
+            raise err
 
 
-def _get_file_stream_handler(url_template, study_id):
+def _get_file_stream_handler(url_template, study_id, raiseError=True):
     """
     Returns a file stream handler for the given URL.
     """
@@ -78,17 +74,16 @@ def _get_file_stream_handler(url_template, study_id):
         req = urllib.request.Request(url=url_get_project_runs, headers={
                                      'Content-Type': 'text/plain'})
         return urllib.request.urlopen(req)
-    except URLError as url_error:
-        print(url_error)
-        raise
-    except IOError as io_error:
-        print(io_error)
-        raise
-    except ValueError as e:
-        print(e)
+    except ValueError as err:
+        print(err)
         print("Could not retrieve any runs. Open the retrieval URL further down in your browser and see if you get any results back. Program will exit now.")
         print(url_get_project_runs)
-        raise
+        if raiseError:
+            raise err
+    except Exception as err:
+        print(err)
+        if raiseError:
+            raise err
 
 
 def _print_program_settings(project_id, version, selected_file_types_list, output_path, root_url):
@@ -142,6 +137,7 @@ def _get_file_info(file_type):
 
     return domain, fileExtension, is_chunked
 
+
 def main():
     function_file_type_list = ["InterProScan", "GOAnnotations",
                                "GOSlimAnnotations"]
@@ -172,23 +168,26 @@ def main():
         nargs='+',
         default=file_categories,
         required=False)
+    parser.add_argument("-s", "--stoponerror",
+        help="Raise and stop on error",
+        action='store_true')
     parser.add_argument("-vb", "--verbose",
         help="Switches on the verbose mode. Doesn't do anything.",
         action='store_true')
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
 
-    verbose = args['verbose']
-    study_id = args['project_id']
-    version = args['version']
+    verbose = args.verbose
+    study_id = args.project_id
+    version = args.version
 
     # Parse the values file formats requested
     selected_file_types = set()
-    for i, v in enumerate(args['file_types']):
-        if v in file_categories.keys():
-            selected_file_types.update(file_categories[v])
+    for val in args.file_types:
+        if val in file_categories.keys():
+            selected_file_types.update(file_categories[val])
         else:
-            selected_file_types.add(v)
+            selected_file_types.add(val)
 
     # Handle differences between pipeline versions
     # PredictedCDS is version 1.0 and 2.0 only
@@ -249,7 +248,7 @@ def main():
 
     # Print out the program settings
     _print_program_settings(study_id, version, selected_file_types,
-                            args['output_path'], root_url)
+                            args.output_path, root_url)
 
     # Iterating over all file types
     for file_type in selected_file_types:
@@ -258,29 +257,29 @@ def main():
         # Retrieve a file stream handler from the given URL and iterate over
         # each line (each run) and build the download link using the variables
         # from above
-        file_stream_handler = _get_file_stream_handler(study_url_template, study_id)
+        file_stream_handler = _get_file_stream_handler(study_url_template, study_id, args.stoponerror)
         reader = csv.reader(file_stream_handler, delimiter=',')
         for study_id, sample_id, run_id in reader:
             print(study_id + ", " + sample_id + ", " + run_id)
 
-            output_path = os.path.join(args['output_path'], study_id, file_type)
+            output_path = os.path.join(args.output_path, study_id, file_type)
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
 
             if is_chunked:
                 number_of_chunks = _get_number_of_chunks(number_of_chunks_url_template, study_id, sample_id, run_id,
-                                                         version, domain, file_type)
+                                                         version, domain, file_type, args.stoponerror)
 
                 for chunk in range(1, number_of_chunks + 1):
                     output_file_name = os.path.join(output_path,
                         "{}_{}_{}{}".format(run_id.replace(" ", "").replace(",", "-"), file_type, chunk, fileExtension))
                     rootUrl = chunk_url_template % (
                         study_id, sample_id, run_id, version, domain, file_type, chunk)
-                    _download_resource_by_url(rootUrl, output_file_name)
+                    _download_resource_by_url(rootUrl, output_file_name, args.stoponerror)
             else:
                 output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",", "-") + "_" + file_type + fileExtension
                 rootUrl = download_url_template % (study_id, sample_id, run_id, version, domain, file_type)
-                _download_resource_by_url(rootUrl, output_file_name)
+                _download_resource_by_url(rootUrl, output_file_name, args.stoponerror)
 
     print("Program finished.")
 
