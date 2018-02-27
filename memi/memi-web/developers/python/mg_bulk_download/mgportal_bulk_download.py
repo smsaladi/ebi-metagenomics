@@ -8,9 +8,9 @@ version: 1.1
 import argparse
 import csv
 import os
-import urllib
-import urllib2
-from urllib2 import URLError
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
+from urllib.error import URLError
 
 
 def _download_resource_by_url(url, output_file_name):
@@ -19,33 +19,33 @@ def _download_resource_by_url(url, output_file_name):
     'url' -- Resource location.
     'output_file_name' -- Path of the output file.
     """
-    print "Starting the download of the following file..."
-    print url
-    print "Saving file in:\n" + output_file_name
+    print("Starting the download of the following file...")
+    print(url)
+    print("Saving file in:\n" + output_file_name)
 
     try:
-        urllib.urlretrieve(url, output_file_name)
+        urllib.request.urlretrieve(url, output_file_name)
     except URLError as url_error:
         print(url_error)
         raise
     except  IOError as io_error:
         print(io_error)
         raise
-    print "Download finished."
+    print("Download finished.")
 
 
 def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, domain, file_type):
     """
     Returns the number of chunks for the given set of parameters (study, sample and run identifier).
     """
-    print "Getting the number of chunks from the following URL..."
+    print("Getting the number of chunks from the following URL...")
     url_get_number_of_chunks = url_template % (
         study_id, sample_id, run_id, version, domain, file_type)
-    print url_get_number_of_chunks
+    print(url_get_number_of_chunks)
     try:
-        file_stream_handler = urllib2.urlopen(url_get_number_of_chunks)
+        file_stream_handler = urllib.request.urlopen(url_get_number_of_chunks)
         result = int(file_stream_handler.read())
-        print "Retrieved " + str(result) + " chunks."
+        print("Retrieved " + str(result) + " chunks.")
         return result
     except URLError as url_error:
         print(url_error)
@@ -55,8 +55,8 @@ def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, do
         raise
     except ValueError as e:
         print(e)
-        print "Skipping this run! Could not retrieve the number of chunks for this URL. " \
-              "Check the version number in the URL and check if the run is available online."
+        print("Skipping this run! Could not retrieve the number of chunks for this URL. " \
+              "Check the version number in the URL and check if the run is available online.")
         return 0
 
 
@@ -64,11 +64,11 @@ def _get_file_stream_handler(url_template, study_id):
     """
     Returns a file stream handler for the given URL.
     """
-    print "Getting the list of project runs..."
+    print("Getting the list of project runs...")
     url_get_project_runs = url_template % (study_id)
     try:
-        req = urllib2.Request(url=url_get_project_runs, headers={'Content-Type': 'text/plain'})
-        return urllib2.urlopen(req)
+        req = urllib.request.Request(url=url_get_project_runs, headers={'Content-Type': 'text/plain'})
+        return urllib.request.urlopen(req)
     except URLError as url_error:
         print(url_error)
         raise
@@ -77,18 +77,18 @@ def _get_file_stream_handler(url_template, study_id):
         raise
     except ValueError as e:
         print(e)
-        print "Could not retrieve any runs. Open the retrieval URL further down in your browser and see if you get any results back. Program will exit now."
-        print url_get_project_runs
+        print("Could not retrieve any runs. Open the retrieval URL further down in your browser and see if you get any results back. Program will exit now.")
+        print(url_get_project_runs)
         raise
 
 
 def _print_program_settings(project_id, version, selected_file_types_list, output_path, root_url):
-    print "Running the program with the following setting..."
-    print "Project: " + project_id
-    print "Pipeline version: " + version
-    print "Selected file types: " + ",".join(selected_file_types_list)
-    print "Root URL: " + root_url
-    print "Writing result to: " + output_path
+    print("Running the program with the following setting...")
+    print("Project: " + project_id)
+    print("Pipeline version: " + version)
+    print("Selected file types: " + ",".join(selected_file_types_list))
+    print("Root URL: " + root_url)
+    print("Writing result to: " + output_path)
 
 
 if __name__ == "__main__":
@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     # Turn on verbose mode if option is set
     verbose = False
-    if 'verbose' in args.keys():
+    if 'verbose' in list(args.keys()):
         verbose = True
 
     # Parse the project accession
@@ -181,10 +181,10 @@ if __name__ == "__main__":
         elif file_type == 'PredictedCDS' or file_type == 'PredicatedCDSWithoutAnnotation' or file_type == \
                 'PredictedCDSWithAnnotation':
             if file_type == 'PredictedCDSWithAnnotation' and (version == '1.0' or version == '2.0'):
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             elif file_type == 'PredictedCDS' and version == '3.0':
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             domain = "sequences"
             fileExtension = ".faa.gz"
@@ -200,10 +200,10 @@ if __name__ == "__main__":
         # NewickTree is version 1 only
         elif file_type == 'NewickPrunedTree' or file_type == 'NewickTree':
             if file_type == 'NewickPrunedTree' and version == '1.0':
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             if file_type == 'NewickTree' and version == '2.0':
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             is_chunked = False
             domain = "taxonomy"
@@ -216,10 +216,10 @@ if __name__ == "__main__":
         # OTU-table-HDF5-BIOM and OTU-table-JSON-BIOM are version 2 only
         elif file_type == 'OTU-BIOM' or file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM':
             if file_type == 'OTU-BIOM' and version == '2.0':
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             if (file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM') and version == '1.0':
-                print "File type '" + file_type + "' is not available for version " + version + "!"
+                print("File type '" + file_type + "' is not available for version " + version + "!")
                 continue
             is_chunked = False
             domain = "taxonomy"
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         file_stream_handler = _get_file_stream_handler(study_url_template, study_id)
         reader = csv.reader(file_stream_handler, delimiter=',')
         for study_id, sample_id, run_id in reader:
-            print study_id + ", " + sample_id + ", " + run_id
+            print(study_id + ", " + sample_id + ", " + run_id)
 
             output_path = args['output_path'] + "/" + study_id + "/" + file_type
             if not os.path.exists(output_path):
@@ -254,4 +254,4 @@ if __name__ == "__main__":
                 rootUrl = download_url_template % (study_id, sample_id, run_id, version, domain, file_type)
                 _download_resource_by_url(rootUrl, output_file_name)
 
-    print "Program finished."
+    print("Program finished.")
