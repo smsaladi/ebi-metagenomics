@@ -10,6 +10,8 @@ from __future__ import print_function
 import argparse
 import csv
 import os
+import os.path
+
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -98,69 +100,101 @@ def _print_program_settings(project_id, version, selected_file_types_list, outpu
     print("Writing result to: " + output_path)
 
 
-if __name__ == "__main__":
-    function_file_type_list = ["InterProScan",
-                               "GOAnnotations", "GOSlimAnnotations"]
+def main():
+    function_file_type_list = ["InterProScan", "GOAnnotations",
+                               "GOSlimAnnotations"]
     sequences_file_type_list = ["ProcessedReads", "ReadsWithPredictedCDS", "ReadsWithMatches", "ReadsWithoutMatches",
                                 "PredictedCDS", "PredictedCDSWithoutAnnotation", "PredictedCDSWithAnnotation",
                                 "PredictedORFWithoutAnnotation", "ncRNA-tRNA-FASTA"]
     taxonomy_file_type_list = ["5S-rRNA-FASTA", "16S-rRNA-FASTA", "23S-rRNA-FASTA", "OTU-TSV", "OTU-BIOM",
                                "OTU-table-HDF5-BIOM", "OTU-table-JSON-BIOM", "NewickTree", "NewickPrunedTree"]
-    # Default list of available file types
-    default_file_type_list = sequences_file_type_list + \
-        function_file_type_list + taxonomy_file_type_list
 
-    # Parse script parameters
+    file_categories = {"AllSequences": sequences_file_type_list,
+                       "AllFunction": function_file_type_list,
+                       "AllTaxonomy": taxonomy_file_type_list}
+
     parser = argparse.ArgumentParser(
-        description="MGPortal bulk download tool.")
+        description="EBI Metagenomics Portal bulk download tool")
     parser.add_argument("-p", "--project_id",
-                        help="Project accession (e.g. ERP001736, SRP000319) from a project which is publicly available on the EBI Metagenomics website (https://www.ebi.ac.uk/metagenomics/projects).**MANDATORY**",
-                        required=True)
+        help="Project accession (e.g. ERP001736, SRP000319) from a project which is publicly available at https://www.ebi.ac.uk/metagenomics/projects",
+        required=True)
     parser.add_argument("-o", "--output_path",
-                        help="Location of the output directory, where the downloadable files get stored.**MANDATORY**",
-                        required=True)
-    parser.add_argument("-v", "--version", help="Version of the pipeline used to generate the results.**MANDATORY**",
-                        required=True)
-    parser.add_argument("-t", "--file_type",
-                        help="Supported file types are: AllFunction, AllTaxonomy, AllSequences OR a comma-separated list of supported file types: " + ', '.join(
-                            default_file_type_list) + " OR a single file type.**OPTIONAL**\nDownloads all file types if not provided.",
-                        required=False)
-    parser.add_argument("-vb", "--verbose", help="Switches on the verbose mode.**OPTIONAL**",
-                        required=False)
+        help="Location of the output directory, where the downloadable files get stored",
+        required=True)
+    parser.add_argument("-v", "--version",
+        help="Version of the pipeline used to generate the results",
+        required=True)
+    parser.add_argument("-t", "--file_types",
+        help="File type(s) desired for download. Downloads all file types if not provided.",
+        options=[*file_categories.keys(), *sequences_file_type_list, *function_file_type_list, *taxonomy_file_type_list],
+        nargs='+',
+        default=file_categories,
+        required=False)
+    parser.add_argument("-vb", "--verbose",
+        help="Switches on the verbose mode.",
+        action='store_true')
+
     args = vars(parser.parse_args())
 
-    # Turn on verbose mode if option is set
-    verbose = False
-    if 'verbose' in list(args.keys()):
-        verbose = True
-
-    # Parse the project accession
+    verbose = args['verbose']
     study_id = args['project_id']
-
-    # Parse the values for the file type parameter
-    selected_file_types_list = []
-    if not args['file_type']:
-        # If not specified use the default set of file types
-        selected_file_types_list = default_file_type_list
-    else:
-        # Remove whitespaces
-        selected_file_types_str = args['file_type'].replace(" ", "")
-        # Set all functional result file types
-        if selected_file_types_str == "AllFunction":
-            selected_file_types_list = function_file_type_list
-        elif selected_file_types_str == "AllTaxonomy":
-            selected_file_types_list = taxonomy_file_type_list
-        elif selected_file_types_str == "AllSequences":
-            selected_file_types_list = sequences_file_type_list
-        # Set defined file types
-        elif len(selected_file_types_str.split(",")) > 1:
-            selected_file_types_list = selected_file_types_str.split(",")
-        # Set single file type
-        else:
-            selected_file_types_list.append(selected_file_types_str)
-
-    # Parse the analysis version
     version = args['version']
+
+    # Parse the values file formats requested
+    selected_file_types = set()
+    for i, v in enumerate(args['file_types']):
+        if v in file_categories.keys():
+            selected_file_types.update(file_categories[v])
+        else:
+            selected_file_types.add(v)
+
+    # Handle differences between pipeline versions
+    # PredictedCDS is version 1.0 and 2.0 only
+    # In v3.0, PredictedCDS was replaced by PredictedCDSWithAnnotation
+    # (PredictedCDS can be gained by concatenation of
+    #  PredictedCDSWithoutAnnotation and PredictedCDSWithAnnotation)
+    if version in ['1.0', '2.0']:
+        if 'PredictedCDSWithAnnotation' in selected_file_types:
+            print("`PredictedCDSWithAnnotation` is not available for version " + version + ". Retrieving all `PredictedCDS`")
+            selected_file_types.remove('PredictedCDSWithAnnotation')
+            selected_file_types.add('PredictedCDS')
+        if 'PredictedCDSWithoutAnnotation' in selected_file_types:
+            print("`PredictedCDSWithoutAnnotation` is not available for version " + version + ". Retrieving all `PredictedCDS`")
+            selected_file_types.remove('PredictedCDSWithoutAnnotation')
+            selected_file_types.add('PredictedCDS')
+    if version == '3.0' and 'PredictedCDS' in selected_file_types:
+        print("`PredictedCDS` is not available for version " + version + ". Retrieving both `PredictedCDSWithoutAnnotation` and `PredictedCDSWithAnnotation`")
+        selected_file_types.remove('PredictedCDS')
+        selected_file_types.update(['PredictedCDSWithoutAnnotation', 'PredictedCDSWithAnnotation'])
+
+    # NewickPrunedTree is version 2 only
+    # NewickTree is version 1 only
+    if version == '1.0' and 'NewickPrunedTree' in selected_file_types:
+        print("`NewickPrunedTree` is not available for version " + version + ". Retrieving `NewickTree`")
+        selected_file_types.remove('NewickPrunedTree')
+        selected_file_types.add('NewickTree')
+    if version == '2.0' and 'NewickTree' in selected_file_types:
+        print("`NewickTree` is not available for version " + version + ". Retrieving `NewickPrunedTree`")
+        selected_file_types.remove('NewickTree')
+        selected_file_types.add('NewickPrunedTree')
+
+    # OTU-BIOM is version 1 only
+    # OTU-table-HDF5-BIOM and OTU-table-JSON-BIOM are version 2 only
+    if version == '1.0':
+        if 'OTU-table-HDF5-BIOM' in selected_file_types:
+            print("`OTU-table-HDF5-BIOM` is not available for version " + version + ". Retrieving `OTU-BIOM`")
+            selected_file_types.remove('OTU-table-HDF5-BIOM')
+            selected_file_types.add('OTU-BIOM')
+        if 'OTU-table-JSON-BIOM' in selected_file_types:
+            print("`OTU-table-JSON-BIOM` is not available for version " + version + ". Retrieving `OTU-BIOM`")
+            selected_file_types.remove('OTU-table-JSON-BIOM')
+            selected_file_types.add('OTU-BIOM')
+    if version == '2.0' and 'OTU-BIOM' in selected_file_types:
+        print("`OTU-BIOM` is not available for version " + version + ". Retrieving `OTU-table-JSON-BIOM`")
+        selected_file_types.remove('OTU-BIOM')
+        selected_file_types.add('OTU-table-JSON-BIOM')
+
+    selected_file_types = list(selected_file_types)
 
     root_url = "https://www.ebi.ac.uk"
     study_url_template = root_url + "/metagenomics/projects/%s/runs"
@@ -172,11 +206,11 @@ if __name__ == "__main__":
         "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s"
 
     # Print out the program settings
-    _print_program_settings(study_id, version, selected_file_types_list, args[
-                            'output_path'], root_url)
+    _print_program_settings(study_id, version, selected_file_types,
+                            args['output_path'], root_url)
 
     # Iterating over all file types
-    for file_type in selected_file_types_list:
+    for file_type in selected_file_types:
         domain = None
         fileExtension = None
         # Boolean flag to indicate if a file type is chunked or not
@@ -187,44 +221,22 @@ if __name__ == "__main__":
         if file_type == 'InterProScan':
             domain = "function"
             fileExtension = ".tsv.gz"
-        elif file_type == 'GOSlimAnnotations' or file_type == 'GOAnnotations':
+        elif file_type in ['GOSlimAnnotations', 'GOAnnotations']:
             domain = "function"
             fileExtension = ".csv"
             is_chunked = False
-        # PredictedCDS is version 1.0 and 2.0 only, from version 3.0 on this file type was replaced by
-        # PredictedCDSWithAnnotation (PredictedCDS can be gained by
-        # concatenation of the 2 sequence file types now)
-        elif file_type == 'PredictedCDS' or file_type == 'PredictedCDSWithoutAnnotation' or file_type == \
-                'PredictedCDSWithAnnotation':
-            if file_type == 'PredictedCDSWithAnnotation' and (version == '1.0' or version == '2.0'):
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
-            elif file_type == 'PredictedCDS' and version == '3.0':
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
+        elif file_type in ['PredictedCDS', 'PredictedCDSWithoutAnnotation', 'PredictedCDSWithAnnotation']:
             domain = "sequences"
             fileExtension = ".faa.gz"
         elif file_type == 'ncRNA-tRNA-FASTA':
             domain = "sequences"
             fileExtension = ".fasta"
             is_chunked = False
-        elif file_type == '5S-rRNA-FASTA' or file_type == '16S-rRNA-FASTA' or file_type == '23S-rRNA-FASTA':
+        elif file_type in ['5S-rRNA-FASTA', '16S-rRNA-FASTA', '23S-rRNA-FASTA']:
             is_chunked = False
             domain = "taxonomy"
             fileExtension = ".fasta"
-        # NewickPrunedTree is version 2 only
-        # NewickTree is version 1 only
-        elif file_type == 'NewickPrunedTree' or file_type == 'NewickTree':
-            if file_type == 'NewickPrunedTree' and version == '1.0':
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
-            if file_type == 'NewickTree' and version == '2.0':
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
+        elif file_type in ['NewickPrunedTree', 'NewickTree']:
             is_chunked = False
             domain = "taxonomy"
             fileExtension = ".tree"
@@ -232,17 +244,7 @@ if __name__ == "__main__":
             is_chunked = False
             domain = "taxonomy"
             fileExtension = ".tsv"
-        # OTU-BIOM is version 1 only
-        # OTU-table-HDF5-BIOM and OTU-table-JSON-BIOM are version 2 only
-        elif file_type == 'OTU-BIOM' or file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM':
-            if file_type == 'OTU-BIOM' and version == '2.0':
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
-            if (file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM') and version == '1.0':
-                print("File type '" + file_type +
-                      "' is not available for version " + version + "!")
-                continue
+        elif file_type in ['OTU-BIOM', 'OTU-table-HDF5-BIOM', 'OTU-table-JSON-BIOM']:
             is_chunked = False
             domain = "taxonomy"
             fileExtension = ".biom"
@@ -253,14 +255,12 @@ if __name__ == "__main__":
         # Retrieve a file stream handler from the given URL and iterate over
         # each line (each run) and build the download link using the variables
         # from above
-        file_stream_handler = _get_file_stream_handler(
-            study_url_template, study_id)
+        file_stream_handler = _get_file_stream_handler(study_url_template, study_id)
         reader = csv.reader(file_stream_handler, delimiter=',')
         for study_id, sample_id, run_id in reader:
             print(study_id + ", " + sample_id + ", " + run_id)
 
-            output_path = args['output_path'] + \
-                "/" + study_id + "/" + file_type
+            output_path = os.path.join(args['output_path'], study_id, file_type)
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
 
@@ -269,17 +269,19 @@ if __name__ == "__main__":
                                                          version, domain, file_type)
 
                 for chunk in range(1, number_of_chunks + 1):
-                    output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",",
-                                                                                           "-") + "_" + file_type + "_" + str(
-                        chunk) + fileExtension
+                    output_file_name = os.path.join(output_path,
+                        "{}_{}_{}{}".format(run_id.replace(" ", "").replace(",", "-"), file_type, chunk, fileExtension))
                     rootUrl = chunk_url_template % (
                         study_id, sample_id, run_id, version, domain, file_type, chunk)
                     _download_resource_by_url(rootUrl, output_file_name)
             else:
-                output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",",
-                                                                                       "-") + "_" + file_type + fileExtension
-                rootUrl = download_url_template % (
-                    study_id, sample_id, run_id, version, domain, file_type)
+                output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",", "-") + "_" + file_type + fileExtension
+                rootUrl = download_url_template % (study_id, sample_id, run_id, version, domain, file_type)
                 _download_resource_by_url(rootUrl, output_file_name)
 
     print("Program finished.")
+
+    return
+
+if __name__ == "__main__":
+    main()
