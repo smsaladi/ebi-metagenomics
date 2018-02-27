@@ -5,11 +5,17 @@ amended 07/11/2016 by Maxim Scheremetjew
 version: 1.1
 '''
 
+from __future__ import print_function
+
 import argparse
 import csv
 import os
-import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
+import urllib.request
+import urllib.parse
+import urllib.error
+import urllib.request
+import urllib.error
+import urllib.parse
 from urllib.error import URLError
 
 
@@ -28,7 +34,7 @@ def _download_resource_by_url(url, output_file_name):
     except URLError as url_error:
         print(url_error)
         raise
-    except  IOError as io_error:
+    except IOError as io_error:
         print(io_error)
         raise
     print("Download finished.")
@@ -55,7 +61,7 @@ def _get_number_of_chunks(url_template, study_id, sample_id, run_id, version, do
         raise
     except ValueError as e:
         print(e)
-        print("Skipping this run! Could not retrieve the number of chunks for this URL. " \
+        print("Skipping this run! Could not retrieve the number of chunks for this URL. "
               "Check the version number in the URL and check if the run is available online.")
         return 0
 
@@ -67,12 +73,13 @@ def _get_file_stream_handler(url_template, study_id):
     print("Getting the list of project runs...")
     url_get_project_runs = url_template % (study_id)
     try:
-        req = urllib.request.Request(url=url_get_project_runs, headers={'Content-Type': 'text/plain'})
+        req = urllib.request.Request(url=url_get_project_runs, headers={
+                                     'Content-Type': 'text/plain'})
         return urllib.request.urlopen(req)
     except URLError as url_error:
         print(url_error)
         raise
-    except  IOError as io_error:
+    except IOError as io_error:
         print(io_error)
         raise
     except ValueError as e:
@@ -92,17 +99,20 @@ def _print_program_settings(project_id, version, selected_file_types_list, outpu
 
 
 if __name__ == "__main__":
-    function_file_type_list = ["InterProScan", "GOAnnotations", "GOSlimAnnotations"]
+    function_file_type_list = ["InterProScan",
+                               "GOAnnotations", "GOSlimAnnotations"]
     sequences_file_type_list = ["ProcessedReads", "ReadsWithPredictedCDS", "ReadsWithMatches", "ReadsWithoutMatches",
                                 "PredictedCDS", "PredictedCDSWithoutAnnotation", "PredictedCDSWithAnnotation",
                                 "PredictedORFWithoutAnnotation", "ncRNA-tRNA-FASTA"]
     taxonomy_file_type_list = ["5S-rRNA-FASTA", "16S-rRNA-FASTA", "23S-rRNA-FASTA", "OTU-TSV", "OTU-BIOM",
                                "OTU-table-HDF5-BIOM", "OTU-table-JSON-BIOM", "NewickTree", "NewickPrunedTree"]
     # Default list of available file types
-    default_file_type_list = sequences_file_type_list + function_file_type_list + taxonomy_file_type_list
+    default_file_type_list = sequences_file_type_list + \
+        function_file_type_list + taxonomy_file_type_list
 
     # Parse script parameters
-    parser = argparse.ArgumentParser(description="MGPortal bulk download tool.")
+    parser = argparse.ArgumentParser(
+        description="MGPortal bulk download tool.")
     parser.add_argument("-p", "--project_id",
                         help="Project accession (e.g. ERP001736, SRP000319) from a project which is publicly available on the EBI Metagenomics website (https://www.ebi.ac.uk/metagenomics/projects).**MANDATORY**",
                         required=True)
@@ -113,7 +123,7 @@ if __name__ == "__main__":
                         required=True)
     parser.add_argument("-t", "--file_type",
                         help="Supported file types are: AllFunction, AllTaxonomy, AllSequences OR a comma-separated list of supported file types: " + ', '.join(
-                                default_file_type_list) + " OR a single file type.**OPTIONAL**\nDownloads all file types if not provided.",
+                            default_file_type_list) + " OR a single file type.**OPTIONAL**\nDownloads all file types if not provided.",
                         required=False)
     parser.add_argument("-vb", "--verbose", help="Switches on the verbose mode.**OPTIONAL**",
                         required=False)
@@ -154,12 +164,16 @@ if __name__ == "__main__":
 
     root_url = "https://www.ebi.ac.uk"
     study_url_template = root_url + "/metagenomics/projects/%s/runs"
-    number_of_chunks_url_template = root_url + "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s/chunks"
-    chunk_url_template = root_url + "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s/chunks/%s"
-    download_url_template = root_url + "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s"
+    number_of_chunks_url_template = root_url + \
+        "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s/chunks"
+    chunk_url_template = root_url + \
+        "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s/chunks/%s"
+    download_url_template = root_url + \
+        "/metagenomics/projects/%s/samples/%s/runs/%s/results/versions/%s/%s/%s"
 
     # Print out the program settings
-    _print_program_settings(study_id, version, selected_file_types_list, args['output_path'], root_url)
+    _print_program_settings(study_id, version, selected_file_types_list, args[
+                            'output_path'], root_url)
 
     # Iterating over all file types
     for file_type in selected_file_types_list:
@@ -168,7 +182,8 @@ if __name__ == "__main__":
         # Boolean flag to indicate if a file type is chunked or not
         is_chunked = True
         # Set the result file domain (sequences, function or taxonomy) dependent on the file type
-        # Set output file extension (tsv, faa or fasta) dependent on the file type
+        # Set output file extension (tsv, faa or fasta) dependent on the file
+        # type
         if file_type == 'InterProScan':
             domain = "function"
             fileExtension = ".tsv.gz"
@@ -177,14 +192,17 @@ if __name__ == "__main__":
             fileExtension = ".csv"
             is_chunked = False
         # PredictedCDS is version 1.0 and 2.0 only, from version 3.0 on this file type was replaced by
-        # PredictedCDSWithAnnotation (PredictedCDS can be gained by concatenation of the 2 sequence file types now)
+        # PredictedCDSWithAnnotation (PredictedCDS can be gained by
+        # concatenation of the 2 sequence file types now)
         elif file_type == 'PredictedCDS' or file_type == 'PredicatedCDSWithoutAnnotation' or file_type == \
                 'PredictedCDSWithAnnotation':
             if file_type == 'PredictedCDSWithAnnotation' and (version == '1.0' or version == '2.0'):
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             elif file_type == 'PredictedCDS' and version == '3.0':
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             domain = "sequences"
             fileExtension = ".faa.gz"
@@ -200,10 +218,12 @@ if __name__ == "__main__":
         # NewickTree is version 1 only
         elif file_type == 'NewickPrunedTree' or file_type == 'NewickTree':
             if file_type == 'NewickPrunedTree' and version == '1.0':
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             if file_type == 'NewickTree' and version == '2.0':
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             is_chunked = False
             domain = "taxonomy"
@@ -216,10 +236,12 @@ if __name__ == "__main__":
         # OTU-table-HDF5-BIOM and OTU-table-JSON-BIOM are version 2 only
         elif file_type == 'OTU-BIOM' or file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM':
             if file_type == 'OTU-BIOM' and version == '2.0':
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             if (file_type == 'OTU-table-HDF5-BIOM' or file_type == 'OTU-table-JSON-BIOM') and version == '1.0':
-                print("File type '" + file_type + "' is not available for version " + version + "!")
+                print("File type '" + file_type +
+                      "' is not available for version " + version + "!")
                 continue
             is_chunked = False
             domain = "taxonomy"
@@ -228,13 +250,17 @@ if __name__ == "__main__":
             domain = "sequences"
             fileExtension = ".fasta.gz"
 
-        # Retrieve a file stream handler from the given URL and iterate over each line (each run) and build the download link using the variables from above
-        file_stream_handler = _get_file_stream_handler(study_url_template, study_id)
+        # Retrieve a file stream handler from the given URL and iterate over
+        # each line (each run) and build the download link using the variables
+        # from above
+        file_stream_handler = _get_file_stream_handler(
+            study_url_template, study_id)
         reader = csv.reader(file_stream_handler, delimiter=',')
         for study_id, sample_id, run_id in reader:
             print(study_id + ", " + sample_id + ", " + run_id)
 
-            output_path = args['output_path'] + "/" + study_id + "/" + file_type
+            output_path = args['output_path'] + \
+                "/" + study_id + "/" + file_type
             if not os.path.exists(output_path):
                 os.makedirs(output_path)
 
@@ -245,13 +271,15 @@ if __name__ == "__main__":
                 for chunk in range(1, number_of_chunks + 1):
                     output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",",
                                                                                            "-") + "_" + file_type + "_" + str(
-                            chunk) + fileExtension
-                    rootUrl = chunk_url_template % (study_id, sample_id, run_id, version, domain, file_type, chunk)
+                        chunk) + fileExtension
+                    rootUrl = chunk_url_template % (
+                        study_id, sample_id, run_id, version, domain, file_type, chunk)
                     _download_resource_by_url(rootUrl, output_file_name)
             else:
                 output_file_name = output_path + "/" + run_id.replace(" ", "").replace(",",
                                                                                        "-") + "_" + file_type + fileExtension
-                rootUrl = download_url_template % (study_id, sample_id, run_id, version, domain, file_type)
+                rootUrl = download_url_template % (
+                    study_id, sample_id, run_id, version, domain, file_type)
                 _download_resource_by_url(rootUrl, output_file_name)
 
     print("Program finished.")
