@@ -100,6 +100,48 @@ def _print_program_settings(project_id, version, selected_file_types_list, outpu
     print("Writing result to: " + output_path)
 
 
+def _get_file_info(file_type):
+    domain = None
+    fileExtension = None
+    is_chunked = True
+    # Set the result file domain (sequences, function or taxonomy) dependent on the file type
+    # Set output file extension (tsv, faa or fasta) dependent on the file
+    if file_type == 'InterProScan':
+        domain = "function"
+        fileExtension = ".tsv.gz"
+    elif file_type in ['GOSlimAnnotations', 'GOAnnotations']:
+        domain = "function"
+        fileExtension = ".csv"
+        is_chunked = False
+    elif file_type in ['PredictedCDS', 'PredictedCDSWithoutAnnotation', 'PredictedCDSWithAnnotation']:
+        domain = "sequences"
+        fileExtension = ".faa.gz"
+    elif file_type == 'ncRNA-tRNA-FASTA':
+        domain = "sequences"
+        fileExtension = ".fasta"
+        is_chunked = False
+    elif file_type in ['5S-rRNA-FASTA', '16S-rRNA-FASTA', '23S-rRNA-FASTA']:
+        is_chunked = False
+        domain = "taxonomy"
+        fileExtension = ".fasta"
+    elif file_type in ['NewickPrunedTree', 'NewickTree']:
+        is_chunked = False
+        domain = "taxonomy"
+        fileExtension = ".tree"
+    elif file_type == 'OTU-TSV':
+        is_chunked = False
+        domain = "taxonomy"
+        fileExtension = ".tsv"
+    elif file_type in ['OTU-BIOM', 'OTU-table-HDF5-BIOM', 'OTU-table-JSON-BIOM']:
+        is_chunked = False
+        domain = "taxonomy"
+        fileExtension = ".biom"
+    else:
+        domain = "sequences"
+        fileExtension = ".fasta.gz"
+
+    return domain, fileExtension, is_chunked
+
 def main():
     function_file_type_list = ["InterProScan", "GOAnnotations",
                                "GOSlimAnnotations"]
@@ -131,7 +173,7 @@ def main():
         default=file_categories,
         required=False)
     parser.add_argument("-vb", "--verbose",
-        help="Switches on the verbose mode.",
+        help="Switches on the verbose mode. Doesn't do anything.",
         action='store_true')
 
     args = vars(parser.parse_args())
@@ -211,46 +253,7 @@ def main():
 
     # Iterating over all file types
     for file_type in selected_file_types:
-        domain = None
-        fileExtension = None
-        # Boolean flag to indicate if a file type is chunked or not
-        is_chunked = True
-        # Set the result file domain (sequences, function or taxonomy) dependent on the file type
-        # Set output file extension (tsv, faa or fasta) dependent on the file
-        # type
-        if file_type == 'InterProScan':
-            domain = "function"
-            fileExtension = ".tsv.gz"
-        elif file_type in ['GOSlimAnnotations', 'GOAnnotations']:
-            domain = "function"
-            fileExtension = ".csv"
-            is_chunked = False
-        elif file_type in ['PredictedCDS', 'PredictedCDSWithoutAnnotation', 'PredictedCDSWithAnnotation']:
-            domain = "sequences"
-            fileExtension = ".faa.gz"
-        elif file_type == 'ncRNA-tRNA-FASTA':
-            domain = "sequences"
-            fileExtension = ".fasta"
-            is_chunked = False
-        elif file_type in ['5S-rRNA-FASTA', '16S-rRNA-FASTA', '23S-rRNA-FASTA']:
-            is_chunked = False
-            domain = "taxonomy"
-            fileExtension = ".fasta"
-        elif file_type in ['NewickPrunedTree', 'NewickTree']:
-            is_chunked = False
-            domain = "taxonomy"
-            fileExtension = ".tree"
-        elif file_type == 'OTU-TSV':
-            is_chunked = False
-            domain = "taxonomy"
-            fileExtension = ".tsv"
-        elif file_type in ['OTU-BIOM', 'OTU-table-HDF5-BIOM', 'OTU-table-JSON-BIOM']:
-            is_chunked = False
-            domain = "taxonomy"
-            fileExtension = ".biom"
-        else:
-            domain = "sequences"
-            fileExtension = ".fasta.gz"
+        domain, fileExtension, is_chunked = _get_file_info(file_type)
 
         # Retrieve a file stream handler from the given URL and iterate over
         # each line (each run) and build the download link using the variables
